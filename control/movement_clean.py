@@ -391,7 +391,7 @@ do_180_cfg = {
 
     # Special dead-end nodes (20, 28)
     "dead_end_forward_throttle": 0.45,
-    "dead_end_forward_ms": 1100,
+    "dead_end_forward_ms": 1250,
     "dead_end_spin_steer": 0.80,
     "dead_end_min_spin_ms": 1500,      # deliberately larger grace time
     "dead_end_timeout_ms": 4000,
@@ -556,34 +556,37 @@ def do_180(node, motors, sensors, cfg=do_180_cfg, ctx=None):
 
 # ---------------------------------------------------------------------
 
-# Grab left/right parameters. Adjust as needed.
+
 grab_cfg = {
     "period_ms": 20,
 
-    # forward into branch
-    "grab_forward_throttle": 0.22,
-    "grab_forward_ms": 100,
+    # creep into branch until ultrasonic threshold
+    "grab_forward_throttle": 0.12,
+    "grab_ultra_threshold_cm": 10.0,
+    "grab_ultra_samples": 5,
+    "grab_ultra_sample_delay_ms": 20,
+    "grab_ultra_consecutive_hits": 2,
+    "grab_ultra_timeout_ms": 2500,
 
     # reverse out to node
     "grab_reverse_throttle": -0.22,
     "grab_reverse_exit_n": 2,
     "grab_reverse_timeout_ms": 1200,
 
-    # optional settle after closing gripper
+    # settle after closing gripper
     "grab_close_wait_ms": 100,
 }
 
 
 def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
-
-
     """
     Behaviour:
     1. turn into the branch using normal turn(direction)
-    2. drive forward with PD for a short fixed time
-    3. close gripper / attempt pickup
+    2. drive forward slowly with PD until ultrasonic threshold is reached
+    3. close gripper
     4. reverse out until sumw >= 3 for N consecutive readings
-    5. return grab result
+    5. return next colour in sequence:
+       red -> yellow -> green -> blue
 
     Returns:
         {"status": "grab_ok", "colour": "..."}
@@ -596,20 +599,22 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
     elif command == "grab_left":
         direction = "left"
     else:
-        direction = None
+        raise ValueError("grab(): command must be 'grab_left' or 'grab_right'")
 
     if ctx is None:
         ctx = MotionContext()
 
-    if direction not in ("left", "right"):
-        raise ValueError("grab(direction): direction must be 'left' or 'right'")
-
+    # -----------------------------------------
     # Phase 1: turn into branch
+    # -----------------------------------------
     turn(direction, motors, sensors, ctx=ctx)
 
-    # Phase 2: drive forward briefly with PD
+    # -----------------------------------------
+    # Phase 2: drive forward until ultrasonic threshold
+    # -----------------------------------------
     t_last = ticks_ms()
     phase_t0 = t_last
+    ultra_hits = 0
 
     while True:
         t_now = fixed_rate_tick(t_last, cfg["period_ms"])
@@ -621,10 +626,10 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
         if err is None:
             default_search_drive(motors, ctx, {
                 "search_throttle": cfg["grab_forward_throttle"],
-                "search_steer": 0.40,
+                "search_steer": 0.25,
             })
         else:
-            thr, steer = pd_follow(err, ctx.last_err, cfg["period_ms"] / 1000.0)
+            _, steer = pd_follow(err, ctx.last_err, cfg["period_ms"] / 1000.0)
             motors.arcade(cfg["grab_forward_throttle"], steer)
             ctx.last_err = err
 
@@ -633,16 +638,39 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
             elif err < 0:
                 ctx.last_search_dir = -1
 
-        if ticks_diff(t_now, phase_t0) >= cfg["grab_forward_ms"]:
-            default_stop(motors)
-            break
+        d = task_sensors.read_ultrasonic_filtered_cm(
+            samples=cfg["grab_ultra_samples"],
+            sample_delay_ms=cfg["grab_ultra_sample_delay_ms"]
+        )
 
-    # Phase 3: close gripper / attempt pickup
-    # Replace this with your real gripper code
+        if d is not None and d <= cfg["grab_ultra_threshold_cm"]:
+            ultra_hits += 1
+            print("GRAB ULTRA HIT {}/{} : {:.1f} cm".format(
+                ultra_hits,
+                cfg["grab_ultra_consecutive_hits"],
+                d
+            ))
+
+            if ultra_hits >= cfg["grab_ultra_consecutive_hits"]:
+                default_stop(motors)
+                break
+        else:
+            ultra_hits = 0
+
+        if ticks_diff(t_now, phase_t0) >= cfg["grab_ultra_timeout_ms"]:
+            default_stop(motors)
+            print("GRAB FAIL: ultrasonic timeout")
+            return "grab_fail"
+
+    # -----------------------------------------
+    # Phase 3: close gripper
+    # -----------------------------------------
     task_sensors.close_gripper()
     sleep_ms(cfg["grab_close_wait_ms"])
 
+    # -----------------------------------------
     # Phase 4: reverse out until node patch seen again
+    # -----------------------------------------
     t_last = ticks_ms()
     phase_t0 = t_last
     reverse_ok = 0
@@ -665,37 +693,18 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
 
         if ticks_diff(t_now, phase_t0) >= cfg["grab_reverse_timeout_ms"]:
             default_stop(motors)
+            print("GRAB FAIL: reverse timeout")
             return "grab_fail"
 
-    # Phase 5: classify result
-    colour = task_sensors.classify_reel()
+    # -----------------------------------------
+    # Phase 5: assign colour by grab order
+    # -----------------------------------------
+    colour = task_sensors.next_grab_colour()
 
-    if colour is None:
-        return "grab_fail"
-
-    return {"status": "grab_ok", "colour": colour}
-
-# ---------------------------------------------------------------------
-
-#Scan left/right parameters. Adjust as needed.  
-scan_cfg = {}
-
-#Scan functions. Should eventually look into the left/right branch and return "scan_empty" or "scan_found" based on whether a reel is detected.
-def scan_left():
-
-    return "scan_empty"
-
-def scan_right():
-
-    return "scan_empty"
-
-# ---------------------------------------------------------------------
-
-#Drop parameters. Adjust as needed.  
-
-#Drop function
-def drop_reel():
-    return None
+    return {
+        "status": "grab_ok",
+        "colour": colour
+    }
 
 # ---------------------------------------------------------------------
 

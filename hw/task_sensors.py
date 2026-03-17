@@ -1,7 +1,6 @@
-# task_sensors.py
-
+from machine import Pin, PWM, I2C, ADC
 from utime import ticks_ms, ticks_diff, sleep_ms
-from machine import Pin, I2C
+
 from libs.VL53L0X.VL53L0X import VL53L0X
 
 
@@ -9,41 +8,111 @@ def default_stop(motors):
     motors.arcade(0.0, 0.0)
 
 
+class Grabber:
+    def __init__(self, pin1, pin2):
+        self.servo_pin1 = pin1
+        self.servo_pin2 = pin2
+
+        self.pwm_pin1 = PWM(Pin(self.servo_pin1), 100)
+        self.pwm_pin2 = PWM(Pin(self.servo_pin2), 100)
+
+        self.servo1_deg = 0
+        self.servo2_deg = 0
+        self.grab_count = 0
+
+    def write_servo1(self, deg):
+        u16_level1 = int(9500 + deg * 48.5)
+        self.pwm_pin1.duty_u16(u16_level1)
+        self.servo1_deg = deg
+
+    def write_servo2(self, deg):
+        u16_level2 = int(9800 + deg * 48.5)
+        self.pwm_pin2.duty_u16(u16_level2)
+        self.servo2_deg = deg
+
+    def reset(self):
+        self.write_servo1(0)
+        self.write_servo2(0)
+
+    def grab(self, lift=True):
+        self.write_servo1(12)
+        if lift:
+            self.write_servo2(self.servo2_deg - 5)
+
+    def opn(self, lift=True):
+        if lift:
+            self.write_servo2(-5)
+        self.write_servo1(-10)
+
+    def lift(self, deg):
+        self.write_servo2(-deg)
+
+    def next_grab_colour(self):
+        colours = ("red", "yellow", "green", "blue")
+
+        if self.grab_count < len(colours):
+            colour = colours[self.grab_count]
+        else:
+            colour = colours[-1]   # keep returning blue after 4th
+
+        self.grab_count += 1
+        return colour
+
+
 class TaskSensors:
     START_BTN_PIN = 16
 
-    # LEFT sensor: GP8 / GP9
+    # LEFT VL53L0X sensor
     LEFT_I2C_ID = 0
     LEFT_SDA_PIN = 8
     LEFT_SCL_PIN = 9
 
-    # RIGHT sensor: change these if needed
+    # RIGHT VL53L0X sensor
     RIGHT_I2C_ID = 0
     RIGHT_SDA_PIN = 20
     RIGHT_SCL_PIN = 21
 
+    # Ultrasonic analog output pin
+    ULTRASONIC_ADC_PIN = 26
+    ULTRASONIC_VCC = 3.3
+    ULTRASONIC_MAX_RANGE_CM = 500.0
+
     SCAN_DURATION_MS = 2000
     SCAN_SAMPLE_PERIOD_MS = 50
 
-    # Right side still as previously estimated
     RIGHT_FOUND_THRESHOLD_MM = 220
-
-    # Left side from your real measurements
     LEFT_FOUND_THRESHOLD_NODES_23_TO_28_MM = 183
     LEFT_FOUND_THRESHOLD_OTHER_MM = 126
 
-    # Reject obvious bogus VL53L0X values
     MIN_VALID_MM = 20
     MAX_VALID_MM = 1000
 
-    def __init__(self):
+    ULTRA_MIN_VALID_CM = 2.0
+    ULTRA_MAX_VALID_CM = 500.0
+
+    def __init__(self, grabber=None):
         self.start_btn = Pin(self.START_BTN_PIN, Pin.IN, Pin.PULL_DOWN)
+        self.grabber = grabber
+        self.ultra_adc = ADC(Pin(self.ULTRASONIC_ADC_PIN))
 
     def start_pressed(self):
         return self.start_btn.value() == 1
 
-    def close_gripper(self):
-        return None
+    def close_gripper(self, lift=True):
+        if self.grabber is not None:
+            self.grabber.grab(lift=lift)
+
+    def open_gripper(self, lift=True):
+        if self.grabber is not None:
+            self.grabber.opn(lift=lift)
+
+    def reset_gripper(self):
+        if self.grabber is not None:
+            self.grabber.reset()
+
+    def lift_gripper(self, deg):
+        if self.grabber is not None:
+            self.grabber.lift(deg)
 
     def classify_reel(self):
         return None
@@ -90,11 +159,9 @@ class TaskSensors:
 
                 try:
                     d = sensor.read()
-
-                    # Reject garbage like 8191
                     if d is not None and self.MIN_VALID_MM <= d <= self.MAX_VALID_MM:
                         readings.append(d)
-                        print("Distance = {}mm".format(d))
+                        print("Distance = {} mm".format(d))
                 except Exception as e:
                     print("VL53L0X read error:", e)
 
@@ -106,16 +173,18 @@ class TaskSensors:
 
         return readings
 
-    @staticmethod
-    def _median(values):
+    def _median(self, values):
         if not values:
             return None
+
         vals = sorted(values)
         n = len(vals)
         mid = n // 2
+
         if n % 2 == 1:
             return vals[mid]
-        return (vals[mid - 1] + vals[mid]) / 2
+        else:
+            return (vals[mid - 1] + vals[mid]) / 2
 
     def scan_right(self, motors=None):
         sensor = self._make_right_sensor()
@@ -128,7 +197,6 @@ class TaskSensors:
         med = self._median(readings)
         print("RIGHT SCAN median =", med)
 
-        # Keep your current right-side convention for now
         if med < self.RIGHT_FOUND_THRESHOLD_MM:
             return "scan_found"
         return "scan_empty"
@@ -151,11 +219,79 @@ class TaskSensors:
 
         print("LEFT SCAN threshold =", threshold)
 
-        # LEFT SENSOR LOGIC IS REVERSED COMPARED TO BEFORE:
-        # reel present => bigger distance
         if med >= threshold:
             return "scan_found"
         return "scan_empty"
+
+    def read_ultrasonic_cm(self):
+        raw_val = self.ultra_adc.read_u16()
+        voltage = raw_val * (self.ULTRASONIC_VCC / 65535.0)
+        distance_cm = (voltage / self.ULTRASONIC_VCC) * self.ULTRASONIC_MAX_RANGE_CM
+        return distance_cm
+
+    def read_ultrasonic_filtered_cm(self, samples=5, sample_delay_ms=20):
+        vals = []
+
+        for _ in range(samples):
+            d = self.read_ultrasonic_cm()
+
+            if self.ULTRA_MIN_VALID_CM <= d <= self.ULTRA_MAX_VALID_CM:
+                vals.append(d)
+
+            sleep_ms(sample_delay_ms)
+
+        if not vals:
+            print("ULTRASONIC: no valid readings")
+            return None
+
+        result = self._median(vals)
+        print("ULTRASONIC median = {:.1f} cm from {}".format(result, vals))
+        return result
+
+    def wait_until_ultrasonic_below(
+        self,
+        threshold_cm,
+        motors=None,
+        samples=5,
+        sample_delay_ms=20,
+        consecutive_hits=3,
+        poll_delay_ms=30,
+        timeout_ms=None
+    ):
+        print("WAIT UNTIL ULTRASONIC <= {} cm".format(threshold_cm))
+
+        t0 = ticks_ms()
+        hits = 0
+
+        while True:
+            if motors is not None:
+                default_stop(motors)
+
+            d = self.read_ultrasonic_filtered_cm(
+                samples=samples,
+                sample_delay_ms=sample_delay_ms
+            )
+
+            if d is not None and d <= threshold_cm:
+                hits += 1
+                print("ULTRASONIC BELOW HIT {}/{} : {:.1f} cm".format(hits, consecutive_hits, d))
+
+                if hits >= consecutive_hits:
+                    if motors is not None:
+                        default_stop(motors)
+                    print("ULTRASONIC THRESHOLD REACHED")
+                    return True
+            else:
+                hits = 0
+
+            if timeout_ms is not None:
+                if ticks_diff(ticks_ms(), t0) >= timeout_ms:
+                    if motors is not None:
+                        default_stop(motors)
+                    print("ULTRASONIC WAIT TIMEOUT")
+                    return False
+
+            sleep_ms(poll_delay_ms)
 
 
 def scan(node, task_sensors, command, motors=None):

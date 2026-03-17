@@ -8,7 +8,6 @@ from hw.motors import DCMotor, MotorPair
 from control.runtime_variables import Mem
 from hw.task_sensors import TaskSensors, wait_until_button_pressed, scan
 
-
 def fixed_rate_tick(t_last, period_ms):
     t_now = ticks_ms()
     dt = ticks_diff(t_now, t_last)
@@ -132,11 +131,11 @@ def main():
             last_result = grab(motors, sensors, command, task_sensors)   # {"status": "grab_ok", "colour": "blue"} or "grab_fail"
 
         elif command == "drop":
-            drop_reel(task_sensors)
+            task_sensors.open_gripper()
             last_result = "drop_done"
 
         elif command == "finished":
-            stop()
+            stop(motors)
             break
 
         else:
