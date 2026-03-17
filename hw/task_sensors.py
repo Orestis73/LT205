@@ -186,22 +186,32 @@ class TaskSensors:
         else:
             return (vals[mid - 1] + vals[mid]) / 2
 
-    def scan_right(self, motors=None):
-        sensor = self._make_right_sensor()
-        readings = self._scan_sensor_for_duration(sensor, motors=motors)
+    def scan_right(self, node, motors=None):
 
-        if not readings:
-            print("RIGHT SCAN: no valid readings")
+        if not (15 <= node <= 20):
+            return "scan_empty"
+        else:
+            sensor = self._make_right_sensor()
+            readings = self._scan_sensor_for_duration(sensor, motors=motors)
+
+            if not readings:
+                print("RIGHT SCAN: no valid readings")
+                return "scan_empty"
+
+            med = self._median(readings)
+            print("RIGHT SCAN median =", med)
+
+            if med < self.RIGHT_FOUND_THRESHOLD_MM:
+                return "scan_found"
             return "scan_empty"
 
-        med = self._median(readings)
-        print("RIGHT SCAN median =", med)
-
-        if med < self.RIGHT_FOUND_THRESHOLD_MM:
-            return "scan_found"
-        return "scan_empty"
-
     def scan_left(self, node, motors=None):
+
+        if not (23 <= node <= 28):
+            return "scan_empty"
+        else:
+            threshold = self.LEFT_FOUND_THRESHOLD_NODES_23_TO_28_MM
+
         sensor = self._make_left_sensor()
         readings = self._scan_sensor_for_duration(sensor, motors=motors)
 
@@ -210,13 +220,8 @@ class TaskSensors:
             return "scan_empty"
 
         med = self._median(readings)
+
         print("LEFT SCAN median =", med)
-
-        if 23 <= node <= 28:
-            threshold = self.LEFT_FOUND_THRESHOLD_NODES_23_TO_28_MM
-        else:
-            threshold = self.LEFT_FOUND_THRESHOLD_OTHER_MM
-
         print("LEFT SCAN threshold =", threshold)
 
         if med >= threshold:
@@ -303,7 +308,7 @@ def scan(node, task_sensors, command, motors=None):
     if command == "scan_left":
         result = task_sensors.scan_left(node=node, motors=motors)
     elif command == "scan_right":
-        result = task_sensors.scan_right(motors=motors)
+        result = task_sensors.scan_right(node=node, motors=motors)
     else:
         raise ValueError("Unknown scan command: {}".format(command))
 

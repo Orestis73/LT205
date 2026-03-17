@@ -118,11 +118,9 @@ def main():
 
         elif command == "scan_left":
             last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
-            last_result = "scan_empty"
 
         elif command == "scan_right":
             last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
-            last_result = "scan_empty"
 
         elif command == "grab_left":
             last_result = grab(motors, sensors, command, task_sensors)   # {"status": "grab_ok", "colour": "blue"} or "grab_fail"
