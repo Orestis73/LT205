@@ -58,59 +58,51 @@ def main():
         print("9  grab right")
         print("0  stop and exit")
 
-        choice = 1
+        choice = input('enter a motion')
 
         try:
             if choice == "1":
-                wait_for_enter()
-                border_push(motors, sensors)
+                border_push(motors, sensors, None)
                 stop(motors)
-                print("border_push done")
-
+                break
+            
             elif choice == "2":
-                wait_for_enter()
                 turn("left", motors, sensors)
                 stop(motors)
                 print("turn left done")
+                break
 
             elif choice == "3":
-                wait_for_enter()
                 turn("right", motors, sensors)
                 stop(motors)
-                print("turn right done")
+                break
 
             elif choice == "4":
-                wait_for_enter()
                 straight(motors, sensors)
                 stop(motors)
                 print("straight done")
 
             elif choice == "5":
-                wait_for_enter()
                 do_180(20, motors, sensors)
                 stop(motors)
                 print("do_180 node 20 done")
 
             elif choice == "6":
-                wait_for_enter()
                 do_180(28, motors, sensors)
                 stop(motors)
                 print("do_180 node 28 done")
 
             elif choice == "7":
-                wait_for_enter()
                 do_180(999, motors, sensors)
                 stop(motors)
                 print("generic do_180 done")
 
             elif choice == "8":
-                wait_for_enter()
                 result = grab(motors, sensors, "grab_left", task_sensors)
                 stop(motors)
                 print("grab left result:", result)
 
             elif choice == "9":
-                wait_for_enter()
                 result = grab(motors, sensors, "grab_right", task_sensors)
                 stop(motors)
                 print("grab right result:", result)

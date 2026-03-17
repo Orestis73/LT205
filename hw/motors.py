@@ -56,8 +56,8 @@ class MotorPair:
         throttle = _clamp(throttle, -1.0, 1.0)
         steer = _clamp(steer, -1.0, 1.0)
 
-        left = throttle - steer
-        right = throttle + steer
+        left = throttle + steer
+        right = throttle - steer
 
         # normalise if needed to keep within [-1,1]
         m = max(abs(left), abs(right), 1.0) 

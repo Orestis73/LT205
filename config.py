@@ -18,8 +18,8 @@ LOOP_HZ = 50
 
 # ---- PD following (YOUR tuned values) ----
 BASE_THROTTLE = 0.70
-KP = 0.20
-KD = 0.005
+KP = 0.45
+KD = 0.01
 MAX_STEER = 0.9
 SLOW_K = 0.10
 MIN_THROTTLE = 0.10
@@ -30,4 +30,4 @@ RECENT_GOOD_LINE_MS = 500 # how long a "recent good line" counts for (used for c
 EVENT_REARM_N = 3 #how many consecutive good line readings are needed to rearm event detection after it was triggered
 EVENT_REARM_MAX = 20 # maximum value for good_rearm counter (prevents overflow if we get a very long good line stretch)
 EVENT_ENTER_N = 4 # how many consecutive event readings are needed to trigger an event (intersection or corner)
-
+EVENT_COOLDOWN_MS = 300

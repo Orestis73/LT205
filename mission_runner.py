@@ -1,12 +1,12 @@
 from simplified_navigator import Navigator
 from utime import ticks_ms, ticks_diff, sleep_ms
-from control.movement_clean import border_push, straight, turn, do_180, scan_left, scan_right, grab, drop_reel, stop
+from control.movement_clean import border_push, straight, turn, do_180, grab, drop_reel, stop
 from control.pd import middle_error_white_line, pd_follow
 import config
 from hw.line import LineSensors
 from hw.motors import DCMotor, MotorPair
 from control.runtime_variables import Mem
-from hw.task_sensors import TaskSensors, wait_until_button_pressed
+from hw.task_sensors import TaskSensors, wait_until_button_pressed, scan
 
 
 def fixed_rate_tick(t_last, period_ms):
@@ -52,7 +52,7 @@ def main():
     task_sensors = TaskSensors()
     wait_until_button_pressed(task_sensors, motors)
 
-    border_push(motors, sensors)
+    border_push(motors, sensors, None)
 
     last_result = None
 
@@ -118,10 +118,12 @@ def main():
             last_result = "done"
 
         elif command == "scan_left":
-            last_result = scan_left()   # "scan_empty" or "scan_found"
+            last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
+            last_result = "scan_empty"
 
         elif command == "scan_right":
-            last_result = scan_right()  # "scan_empty" or "scan_found"
+            last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
+            last_result = "scan_empty"
 
         elif command == "grab_left":
             last_result = grab(motors, sensors, command, task_sensors)   # {"status": "grab_ok", "colour": "blue"} or "grab_fail"

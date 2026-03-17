@@ -54,16 +54,16 @@ def compute_event(t_now, ctx, corner_raw, inter_raw):
 border_push_cfg = {
     "period_ms": 20,
 
-    "start_throttle": 0.35,
+    "start_throttle": 0.5,
     "start_see_white_n": 2,
 
-    "border_timeout_ms": 2000,
+    "border_timeout_ms": 5000,
     "border_bias_k": 0.20,
     "border_bias_max": 0.60,
     "border_throttle": 0.35,
     "border_exit_n": 3,
 
-    "acquire_timeout_ms": 1500,
+    "acquire_timeout_ms": 3000,
     "acquire_search_steer": 0.55,
     "acquire_steer": 0.35,
     "acquire_throttle": 0.20,
@@ -88,6 +88,7 @@ def border_push(motors, sensors, ctx, cfg = border_push_cfg):
         ctx = MotionContext()
 
     while True:
+        print(phase)
 
         #Get sensor readings and do fixed-rate ticking
         t_now = fixed_rate_tick(t_last, cfg["period_ms"])
@@ -208,10 +209,10 @@ turn_cfg = {
     "period_ms": 20,              # control loop period (50 Hz)
 
     "straight_throttle": 0.35,    # forward speed during approach phase
-    "turn_approach_ms": 120,      # short forward push before spinning
+    "turn_approach_ms": 250,      # short forward push before spinning
 
     "turn_spin_steer": 0.75,      # spin strength: left = -0.75, right = +0.75
-    "turn_min_spin_ms": 500,      # minimum time before line reacquire is allowed
+    "turn_min_spin_ms": 600,      # minimum time before line reacquire is allowed
     "turn_timeout_ms": 1200,      # fail-safe timeout for spin phase
 
     "turn_reacquire_n": 4,        # consecutive good_line reads needed to finish turn
@@ -389,23 +390,23 @@ do_180_cfg = {
     "period_ms": 20,
 
     # Special dead-end nodes (20, 28)
-    "dead_end_forward_throttle": 0.30,
-    "dead_end_forward_ms": 140,
+    "dead_end_forward_throttle": 0.45,
+    "dead_end_forward_ms": 1100,
     "dead_end_spin_steer": 0.80,
-    "dead_end_min_spin_ms": 750,      # deliberately larger grace time
-    "dead_end_timeout_ms": 1800,
+    "dead_end_min_spin_ms": 1500,      # deliberately larger grace time
+    "dead_end_timeout_ms": 4000,
 
     # Generic 180 elsewhere
-    "generic_reverse_throttle": -0.25,
-    "generic_reverse_ms": 120,
+    "generic_reverse_throttle": -0.50,
+    "generic_reverse_ms": 350,
     "generic_spin_steer": 0.80,
-    "generic_min_spin_ms": 380,
-    "generic_timeout_ms": 1600,
+    "generic_min_spin_ms": 1000,
+    "generic_timeout_ms": 4000,
 
     # Shared align phase
     "align_search_throttle": 0.18,
     "align_search_steer": 0.55,
-    "align_reacquire_n": 4,
+    "align_reacquire_n": 3,
     "align_timeout_ms": 900,
 }
 
@@ -700,4 +701,7 @@ def drop_reel():
 
 #Stop function. 
 def stop(motors):
-    default_stop(motors)
+    while(True):
+        default_stop(motors)
+        sleep_ms(50)
+

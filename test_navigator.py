@@ -28,13 +28,13 @@ from simplified_navigator import (
 #   od slot 4 -> red
 #
 # Keys match navigator slot keys: (stack, slot)
-WORLD_REELS = { }
+#WORLD_REELS = { }
 
-WORLD_REELSS = {
+WORLD_REELS = {
     ("pd", 2): "blue",
-    ("pd", 5): "green",
-    ("ou", 3): "yellow",
-    ("od", 4): "red",
+    ("pd", 3): "green",
+    ("pd", 4): "yellow",
+    ("pd", 5): "red",
 }
 
 
