@@ -567,6 +567,7 @@ grab_cfg = {
     "grab_ultra_sample_delay_ms": 20,
     "grab_ultra_consecutive_hits": 2,
     "grab_ultra_timeout_ms": 2500,
+    "grab_forward_ms": 300,
 
     # reverse out to node
     "grab_reverse_throttle": -0.22,
@@ -582,7 +583,7 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
     """
     Behaviour:
     1. turn into the branch using normal turn(direction)
-    2. drive forward slowly with PD until ultrasonic threshold is reached
+    2. drive forward slowly with PD for a fixed time
     3. close gripper
     4. reverse out until sumw >= 3 for N consecutive readings
     5. return next colour in sequence:
@@ -610,11 +611,10 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
     turn(direction, motors, sensors, ctx=ctx)
 
     # -----------------------------------------
-    # Phase 2: drive forward until ultrasonic threshold
+    # Phase 2: drive forward for fixed time
     # -----------------------------------------
     t_last = ticks_ms()
     phase_t0 = t_last
-    ultra_hits = 0
 
     while True:
         t_now = fixed_rate_tick(t_last, cfg["period_ms"])
@@ -638,29 +638,9 @@ def grab(motors, sensors, command, task_sensors, cfg=grab_cfg, ctx=None):
             elif err < 0:
                 ctx.last_search_dir = -1
 
-        d = task_sensors.read_ultrasonic_filtered_cm(
-            samples=cfg["grab_ultra_samples"],
-            sample_delay_ms=cfg["grab_ultra_sample_delay_ms"]
-        )
-
-        if d is not None and d <= cfg["grab_ultra_threshold_cm"]:
-            ultra_hits += 1
-            print("GRAB ULTRA HIT {}/{} : {:.1f} cm".format(
-                ultra_hits,
-                cfg["grab_ultra_consecutive_hits"],
-                d
-            ))
-
-            if ultra_hits >= cfg["grab_ultra_consecutive_hits"]:
-                default_stop(motors)
-                break
-        else:
-            ultra_hits = 0
-
-        if ticks_diff(t_now, phase_t0) >= cfg["grab_ultra_timeout_ms"]:
+        if ticks_diff(t_now, phase_t0) >= cfg["grab_forward_ms"]:
             default_stop(motors)
-            print("GRAB FAIL: ultrasonic timeout")
-            return "grab_fail"
+            break
 
     # -----------------------------------------
     # Phase 3: close gripper
