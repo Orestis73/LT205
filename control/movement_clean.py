@@ -406,7 +406,7 @@ do_180_cfg = {
     # Shared align phase
     "align_search_throttle": 0.18,
     "align_search_steer": 0.55,
-    "align_reacquire_n": 3,
+    "align_reacquire_n": 1,
     "align_timeout_ms": 900,
 }
 
@@ -515,13 +515,6 @@ def do_180(node, motors, sensors, cfg=do_180_cfg, ctx=None):
             # Transition to align once a plausible line is visible
             # For dead-end cases, be stricter: require valid err.
             if special_dead_end:
-                if err is not None:
-                    phase = "align"
-                    phase_t0 = t_now
-                    reacquire_ok = 0
-            else:
-                # Generic case: any plausible visible line is enough to try align
-                if white[1] == 1 or white[2] == 1:
                     phase = "align"
                     phase_t0 = t_now
                     reacquire_ok = 0
@@ -546,7 +539,7 @@ def do_180(node, motors, sensors, cfg=do_180_cfg, ctx=None):
             motors.arcade(thr, steer)
             ctx.last_err = err
 
-            if good_line:
+            if white==[1]==1 and white[2]==1:
                 reacquire_ok += 1
                 if reacquire_ok >= cfg["align_reacquire_n"]:
                     default_stop(motors)
@@ -570,7 +563,7 @@ grab_cfg = {
     "grab_forward_ms": 300,
 
     # reverse out to node
-    "grab_reverse_throttle": -0.22,
+    "grab_reverse_throttle": -0.2,
     "grab_reverse_exit_n": 2,
     "grab_reverse_timeout_ms": 1200,
 

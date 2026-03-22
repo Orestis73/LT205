@@ -31,6 +31,8 @@ from simplified_navigator import (
 #WORLD_REELS = { }
 
 WORLD_REELS = {
+
+
     ("pd", 2): "blue",
     ("pd", 3): "green",
     ("pd", 4): "yellow",

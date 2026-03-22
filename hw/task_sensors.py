@@ -18,7 +18,6 @@ class Grabber:
 
         self.servo1_deg = 0
         self.servo2_deg = 0
-        self.grab_count = 0
 
     def write_servo1(self, deg):
         u16_level1 = int(9500 + deg * 48.5)
@@ -47,16 +46,6 @@ class Grabber:
     def lift(self, deg):
         self.write_servo2(-deg)
 
-    def next_grab_colour(self):
-        colours = ("red", "yellow", "green", "blue")
-
-        if self.grab_count < len(colours):
-            colour = colours[self.grab_count]
-        else:
-            colour = colours[-1]   # keep returning blue after 4th
-
-        self.grab_count += 1
-        return colour
 
 
 class TaskSensors:
@@ -81,7 +70,7 @@ class TaskSensors:
     SCAN_SAMPLE_PERIOD_MS = 50
 
     RIGHT_FOUND_THRESHOLD_MM = 220
-    LEFT_FOUND_THRESHOLD_NODES_23_TO_28_MM = 183
+    LEFT_FOUND_THRESHOLD_NODES_23_TO_28_MM = 190
     LEFT_FOUND_THRESHOLD_OTHER_MM = 126
 
     MIN_VALID_MM = 20
@@ -92,19 +81,36 @@ class TaskSensors:
 
     def __init__(self, grabber=None):
         self.start_btn = Pin(self.START_BTN_PIN, Pin.IN, Pin.PULL_DOWN)
-        self.grabber = grabber
+        self.grabber = Grabber(15, 13)
+        self.grabber.reset()
         self.ultra_adc = ADC(Pin(self.ULTRASONIC_ADC_PIN))
+        self.grab_count=0
 
     def start_pressed(self):
         return self.start_btn.value() == 1
 
     def close_gripper(self, lift=True):
         if self.grabber is not None:
-            self.grabber.grab(lift=lift)
+            self.grabber.grab(False)
+            sleep_ms(700)
+            self.grabber.lift(10)
 
     def open_gripper(self, lift=True):
         if self.grabber is not None:
-            self.grabber.opn(lift=lift)
+            self.grabber.opn(False)
+            sleep_ms(700)
+            self.grabber.lift(0)
+            self.grabber.reset()
+
+
+    def next_grab_colour(self):
+        colours = ("red", "yellow", "green", "blue")
+
+        if self.grab_count < len(colours):
+            colour = colours[self.grab_count%4]
+
+        self.grab_count += 1
+        return colour
 
     def reset_gripper(self):
         if self.grabber is not None:
@@ -201,7 +207,7 @@ class TaskSensors:
             med = self._median(readings)
             print("RIGHT SCAN median =", med)
 
-            if med < self.RIGHT_FOUND_THRESHOLD_MM:
+            if med >= self.RIGHT_FOUND_THRESHOLD_MM and med <300:
                 return "scan_found"
             return "scan_empty"
 
@@ -224,7 +230,7 @@ class TaskSensors:
         print("LEFT SCAN median =", med)
         print("LEFT SCAN threshold =", threshold)
 
-        if med >= threshold:
+        if med >= threshold and med <280:
             return "scan_found"
         return "scan_empty"
 

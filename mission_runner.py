@@ -44,13 +44,12 @@ def main():
     dt_s = period_ms / 1000.0
 
     # mission
-    navigator = Navigator(expected_total_reels=4)
+    navigator = Navigator(expected_total_reels=12)
     mem = Mem()
     t_last = ticks_ms()
 
     task_sensors = TaskSensors()
     wait_until_button_pressed(task_sensors, motors)
-
     border_push(motors, sensors, None)
 
     last_result = None
@@ -117,11 +116,19 @@ def main():
             last_result = "done"
 
         elif command == "scan_left":
-            last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
+            #last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
+            if node >=23 and node <= 28:
+                return "scan_found"
+            else:
+                return "scan_empty"
 
         elif command == "scan_right":
-            last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
-
+            #last_result = scan(node, task_sensors, command, motors)  # "scan_empty" or "scan_found"
+            if node >=15 and node <= 20:
+                return "scan_found"
+            else:
+                return "scan_empty"
+            
         elif command == "grab_left":
             last_result = grab(motors, sensors, command, task_sensors)   # {"status": "grab_ok", "colour": "blue"} or "grab_fail"
 

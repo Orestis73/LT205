@@ -17,7 +17,7 @@ LINE_INVERT = False  # keep unless your black/white polarity is wrong
 LOOP_HZ = 50
 
 # ---- PD following (YOUR tuned values) ----
-BASE_THROTTLE = 0.65
+BASE_THROTTLE = 0.75
 KP = 0.35
 KD = 0.008
 MAX_STEER = 0.9
